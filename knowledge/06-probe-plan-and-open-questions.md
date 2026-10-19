@@ -31,6 +31,36 @@ rmx-server and talks to **rmx-backend-probe** over **MQTT over TLS** (`mqtt.rmx.
       (4.39 MB free, 284 KB internal)
 - App image 833 KB in a 4 MB OTA slot.
 
+### Remote commands over MQTT — verified 2026-10-19
+
+The device subscribes `mower/probe-device/cmd` (QoS 1) and answers on
+`mower/probe-device/cmd/ack`: the planned mower command path, rehearsed. Code: `main/remote_cmd.c`;
+PC sender: `tools/mqtt_cmd.ps1` (login `app`, the backend role, via `mosquitto_rr`).
+
+```jsonc
+// in:  mower/probe-device/cmd
+{"id":"pc-1a2b","cmd":"create","value":"hi","expires_at":1792443479}
+// out: mower/probe-device/cmd/ack
+{"id":"pc-1a2b","cmd":"create","ok":true,"result":{"kind":"record","record_id":41,"connection_type":"mqtt"},"ms":479,"time":1792443419}
+{"id":"pc-1a2b","cmd":"create","ok":false,"error":"expired","message":"…","ms":0,"time":…}
+```
+
+- Commands: `ping`, `status` (uptime, PPP, rssi, heap, clock), `create`/`list`/`delete` (forwarded
+  to the probe server over MQTT), `https_create`/`https_list` (over HTTPS; logs in again once on
+  failure), `restart` (acks, then leaves PPP and restarts).
+- Errors: `bad_request`, `unknown_cmd`, `expired`, `no_clock`, `timeout`, `failed`, or the probe
+  server's own code. Duplicate ids (QoS 1 redelivery; last 8 kept) are ignored without a reply.
+- `expires_at` (unix s, optional): refused when past, or when the clock isn't set. The clock comes
+  from SNTP (`pool.ntp.org`) over PPP right after boot (worked first try, < 4 s).
+- Measured PC → device → PC round trip (incl. a fresh TLS connect of `mosquitto_rr`): ~0.5–1 s;
+  `create` ~0.5 s on the device, `https_create` ~3.7 s (new TLS handshake, the HTTPS client is
+  closed after the self-test). After `restart` the device was back and answering in ~30 s.
+- Commands run on their own task (queue of 4): the MQTT task must never block, because a
+  forwarded request waits for its response on that same task.
+- `mosquitto_rr` 2.0.20 has no `-f`; it silently sent an empty payload. Use `-m` (quote-escaped).
+- Using `app` from the PC: on 8883 its client id is forced to `app`, so a real backend on that
+  login would be kicked while the script runs (no backend runs yet).
+
 Not yet done: reconnect handling verified under real signal loss (the code redials and
 power-cycles the modem, untested), CMUX, sleep/power saving, modem MQTT AT path, GNSS,
 OTA, secrets in NVS instead of sdkconfig, SNTP + certificate date checks.
@@ -72,6 +102,7 @@ MQTT client settings to start with:
    Copy them into `sdkconfig` with ssh without printing them. NVS later.
 4. Status / last will: `mower/probe-device/status` (retained `online` / `offline`), the only
    status topic the ACL lets `probe-device` write.
+5. Remote commands from the PC use the existing `app` login (no new VPS user).
 
 Still open: modem firmware update B04 → B06 (not needed so far); whether the probe should
 exercise the real `mower/mower-01/…` topics.

@@ -13,7 +13,8 @@ to **rmx-server** and talks to **rmx-backend-probe** with **MQTT over TLS** and 
 Probe firmware working on the hardware (2026-10-19): over LTE (PPP) it logs in to the
 broker as `probe-device`, sends `create`/`list` on `probe/req/probe-device` and gets the
 answers on `probe/res/probe-device`; over HTTPS it logs in (session cookie + `Origin`)
-and creates/lists records. Details: [knowledge/06](knowledge/06-probe-plan-and-open-questions.md).
+and creates/lists records. It also takes remote commands from the PC on
+`mower/probe-device/cmd` and replies on `…/cmd/ack`. Details: [knowledge/06](knowledge/06-probe-plan-and-open-questions.md).
 
 ## Build, configure, flash (PowerShell)
 
@@ -28,10 +29,24 @@ python -I -u tools\serial_log.py COM6 120 --until SELF-TEST
 
 `sdkconfig` holds the passwords and is gitignored: never commit it.
 
+## Send a command from the PC
+
+```powershell
+tools\mqtt_cmd.ps1 ping
+tools\mqtt_cmd.ps1 status
+tools\mqtt_cmd.ps1 create -Value "hello from the PC"
+tools\mqtt_cmd.ps1 https_create -Value "via HTTPS"
+tools\mqtt_cmd.ps1 delete -RecordId 41
+tools\mqtt_cmd.ps1 restart
+```
+
+Commands: `ping status create list delete https_create https_list restart`. Each carries
+`expires_at` (now + `-TtlS`, default 60 s). Needs the Mosquitto clients for Windows and `ssh rmx-vps`.
+
 ## Layout
 
 ```
-main/        the probe firmware: board, cell (esp_modem PPP), mqtt_link, https_api, probe_proto
+main/        the probe firmware: board, cell (esp_modem PPP), mqtt_link, https_api, probe_proto, remote_cmd
 knowledge/   knowledge base about the board, modem, ESP-IDF, esp_modem and the server contract
              → start with knowledge/INDEX.md
 tools/       at_bridge (AT console firmware), at_session.py (AT script), ppp_smoke (PPP + TLS test)

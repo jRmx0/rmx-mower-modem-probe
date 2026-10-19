@@ -26,6 +26,9 @@ static EventGroupHandle_t s_ev;
 static SemaphoreHandle_t s_req_lock;
 static char s_req_topic[96];
 static char s_res_topic[96];
+static char s_cmd_topic[96];
+static char s_ack_topic[96];
+static mqtt_link_cmd_cb_t s_cmd_cb;
 static int s_res_sub_msg_id = -1;
 static int64_t s_connect_started_us;
 
@@ -40,7 +43,9 @@ static char s_rx_topic[96];
 
 static void handle_message(const char *topic, const char *data, size_t len)
 {
-    if (strcmp(topic, s_res_topic) == 0) {
+    if (s_cmd_cb && strcmp(topic, s_cmd_topic) == 0) {
+        s_cmd_cb(data, len);
+    } else if (strcmp(topic, s_res_topic) == 0) {
         probe_result_t r;
         if (!probe_proto_parse_response(data, len, &r)) {
             ESP_LOGW(TAG, "unparsable response (%u bytes)", (unsigned)len);
@@ -106,6 +111,9 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         s_res_sub_msg_id = esp_mqtt_client_subscribe_single(s_client, s_res_topic, 1);
         esp_mqtt_client_subscribe_single(s_client, "probe/events/records", 0);
         esp_mqtt_client_subscribe_single(s_client, "probe/status/server", 1);
+        if (s_cmd_cb) {
+            esp_mqtt_client_subscribe_single(s_client, s_cmd_topic, 1);
+        }
         if (CONFIG_PROBE_MQTT_STATUS_TOPIC[0]) {
             esp_mqtt_client_publish(s_client, CONFIG_PROBE_MQTT_STATUS_TOPIC, "online", 0, 1, 1);
         }
@@ -138,6 +146,11 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
     }
 }
 
+void mqtt_link_set_cmd_handler(mqtt_link_cmd_cb_t cb)
+{
+    s_cmd_cb = cb;
+}
+
 esp_err_t mqtt_link_start(void)
 {
     if (!CONFIG_PROBE_MQTT_PASSWORD[0]) {
@@ -148,6 +161,8 @@ esp_err_t mqtt_link_start(void)
     s_req_lock = xSemaphoreCreateMutex();
     snprintf(s_req_topic, sizeof(s_req_topic), "probe/req/%s", CONFIG_PROBE_MQTT_USERNAME);
     snprintf(s_res_topic, sizeof(s_res_topic), "probe/res/%s", CONFIG_PROBE_MQTT_USERNAME);
+    snprintf(s_cmd_topic, sizeof(s_cmd_topic), "mower/%s/cmd", CONFIG_PROBE_MQTT_USERNAME);
+    snprintf(s_ack_topic, sizeof(s_ack_topic), "mower/%s/cmd/ack", CONFIG_PROBE_MQTT_USERNAME);
 
     esp_mqtt_client_config_t cfg = {
         .broker.address.uri = CONFIG_PROBE_MQTT_URI,
@@ -217,6 +232,20 @@ esp_err_t mqtt_link_request(probe_op_t op, int64_t id, const char *value,
     free(json);
     xSemaphoreGive(s_req_lock);
     return err;
+}
+
+esp_err_t mqtt_link_send_ack(const char *json)
+{
+    if (!s_client) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    int msg_id = esp_mqtt_client_publish(s_client, s_ack_topic, json, 0, 1, 0);
+    if (msg_id < 0) {
+        ESP_LOGE(TAG, "publish on %s failed", s_ack_topic);
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "-> %s %s", s_ack_topic, json);
+    return ESP_OK;
 }
 
 void mqtt_link_stop(void)
