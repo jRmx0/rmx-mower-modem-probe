@@ -6,6 +6,7 @@ Diagnostic firmware and scripts for the LilyGo T-SIM7600. All were run on the re
 |---|---|
 | [`at_bridge/`](at_bridge/) | ESP-IDF app: powers the modem with the board's pin sequence, then bridges USB console ⇄ modem UART (like LilyGo's ATdebug). |
 | [`at_session.py`](at_session.py) | Host script: resets the ESP, waits for `at_bridge`, sends AT commands, prints replies. |
+| [`serial_log.py`](serial_log.py) | Host script: resets the ESP and prints its log (`COM6 [seconds] [--until TEXT]`). |
 | [`ppp_smoke/`](ppp_smoke/) | ESP-IDF app: esp_modem PPP → HTTPS GET `api.rmx.lt/probe/health` → MQTTS to `mqtt.rmx.lt:8883` with a fake login (expects CONNACK 5). The reference for the probe firmware. |
 
 ## Build and flash (PowerShell)

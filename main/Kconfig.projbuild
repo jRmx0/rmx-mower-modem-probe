@@ -1,0 +1,56 @@
+menu "rmx probe"
+
+    comment "Secrets: set them with menuconfig; they land in the gitignored sdkconfig. Never commit them."
+
+    config PROBE_APN
+        string "Cellular APN"
+        default "internet"
+        help
+            APN of the SIM. "internet" for Tele2 LT / Pildyk.
+
+    config PROBE_MQTT_URI
+        string "MQTT broker URI"
+        default "mqtts://mqtt.rmx.lt:8883"
+
+    config PROBE_MQTT_USERNAME
+        string "MQTT username"
+        default "probe-device"
+        help
+            Mosquitto login. On 8883 the broker forces the client id to the
+            username, so the device uses probe/req/<username> and
+            probe/res/<username>.
+
+    config PROBE_MQTT_PASSWORD
+        string "MQTT password"
+        default ""
+
+    config PROBE_MQTT_STATUS_TOPIC
+        string "Retained status / last-will topic (empty = none)"
+        default "mower/probe-device/status"
+        help
+            The device publishes "online" (retained) after connecting and
+            the broker publishes "offline" (retained) as its last will.
+            The ACL lets every login write mower/<username>/#.
+
+    config PROBE_API_BASE
+        string "Probe HTTPS API base URL"
+        default "https://api.rmx.lt/probe"
+
+    config PROBE_API_ORIGIN
+        string "Origin header for non-GET requests"
+        default "https://api.rmx.lt"
+
+    config PROBE_WEB_USERNAME
+        string "Probe web login username"
+        default "probe-device"
+
+    config PROBE_WEB_PASSWORD
+        string "Probe web login password"
+        default ""
+
+    config PROBE_HEARTBEAT_S
+        int "Seconds between MQTT create requests after the self-test (0 = off)"
+        default 0
+        range 0 86400
+
+endmenu

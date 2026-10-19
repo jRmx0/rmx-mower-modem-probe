@@ -5,8 +5,8 @@ LTE and talks to rmx-backend-probe with MQTT over TLS (`mqtt.rmx.lt:8883`) and H
 (`api.rmx.lt/probe/…`).
 
 **Read [knowledge/INDEX.md](knowledge/INDEX.md) first.** It indexes verified facts about the
-board, the modem, the ESP-IDF setup, esp_modem/PPP, and the server contract. Working reference
-code: `tools/ppp_smoke/main/ppp_smoke.c`. Update the knowledge files when you learn something
+board, the modem, the ESP-IDF setup, esp_modem/PPP, and the server contract. The probe firmware is in
+`main/` (verified on hardware); the minimal reference is `tools/ppp_smoke/main/ppp_smoke.c`. Update the knowledge files when you learn something
 new or find a fact wrong (mark what you verified on hardware and when).
 
 ## Environment

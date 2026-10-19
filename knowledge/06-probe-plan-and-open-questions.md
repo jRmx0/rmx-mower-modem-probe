@@ -17,10 +17,25 @@ rmx-server and talks to **rmx-backend-probe** over **MQTT over TLS** (`mqtt.rmx.
 - [x] Recovery after an ESP reset while the modem is in PPP
 - [x] Fallback: modem-internal TLS (AT+CCH*) with CA verification to both hosts
 
-Not yet done: real MQTT login + pub/sub on `probe/…`, HTTPS login + CRUD, CMUX, reconnect
-handling under signal loss, sleep/power saving, modem MQTT AT path, GNSS.
+### The probe firmware itself (repo root, `main/`) — verified 2026-10-19, 2 runs
 
-## Suggested firmware structure
+- [x] MQTT login `probe-device` over TLS (CONNACK in ~3.6 s incl. handshake), SUBACK on
+      `probe/res/probe-device`, retained `probe/status/server` = `online` received
+- [x] MQTT `create` on `probe/req/probe-device` → answer on `probe/res/probe-device` in ~240 ms
+      (`connection_type: mqtt`), plus the `probe/events/records` event; `list` in ~370 ms
+- [x] HTTPS: health 200 (3.7 s incl. TLS), login 200 + `__Secure-probe_session` cookie (~310 ms),
+      `POST /api/records` with `Origin: https://api.rmx.lt` + cookie → 201 (`connection_type: https`),
+      `GET /api/records` 200 (~310 ms). The keep-alive connection reuses one TLS session.
+- [x] ESP reset while the modem was in PPP → next boot connects normally (PPP in ~150 ms)
+- [x] 3 min online afterwards: PPP and MQTT stayed up (keepalive 60 s), heap stable
+      (4.39 MB free, 284 KB internal)
+- App image 833 KB in a 4 MB OTA slot.
+
+Not yet done: reconnect handling verified under real signal loss (the code redials and
+power-cycles the modem, untested), CMUX, sleep/power saving, modem MQTT AT path, GNSS,
+OTA, secrets in NVS instead of sdkconfig, SNTP + certificate date checks.
+
+## Firmware structure (implemented)
 
 ```
 main/
@@ -46,16 +61,20 @@ MQTT client settings to start with:
 - `buffer.size` ≥ 16–64 KB if the device sends `list`
 - QoS 1 for requests; match responses by `request_id`
 
-## Open questions for the user
+## Decisions (answered by the user 2026-10-19)
 
-1. **MQTT login for the device**: reuse `probe-web` (password exists on the server) or create a
-   new user (e.g. `probe-device`) with an ACL entry on the VPS? (VPS change → rmx-vps CHANGELOG.)
-2. **HTTPS login**: which web user should the device use (create one with
-   `probe-server create-user` on the VPS)?
-3. **Secrets on the device**: sdkconfig (gitignored) for now, NVS later? Never commit them.
-4. Should the probe also exercise the planned `mower/mower-01/…` topics (already allowed by the ACL)?
-5. Modem firmware update B04 → B06: not needed so far; only if bugs show up.
-6. Is the probe running on the VPS when testing? (It is off by default → 502.)
+1. **MQTT login**: a dedicated Mosquitto user **`probe-device`** (rmx-vps branch
+   `probe-device-login`). ACL: write `probe/req/probe-device`; read `probe/res/probe-device`,
+   `probe/events/#`, `probe/status/#` (plus the `mower/probe-device/#` pattern every login gets).
+2. **HTTPS login**: a dedicated web user **`probe-device`** (`probe-server create-user`).
+3. **Secrets**: both passwords live in the gitignored `sdkconfig` (`CONFIG_PROBE_MQTT_PASSWORD`,
+   `CONFIG_PROBE_WEB_PASSWORD`); plain-text copies only in the VPS `credentials.txt` files.
+   Copy them into `sdkconfig` with ssh without printing them. NVS later.
+4. Status / last will: `mower/probe-device/status` (retained `online` / `offline`), the only
+   status topic the ACL lets `probe-device` write.
+
+Still open: modem firmware update B04 → B06 (not needed so far); whether the probe should
+exercise the real `mower/mower-01/…` topics.
 
 ## Risks / gotchas to remember
 

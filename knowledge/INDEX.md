@@ -9,7 +9,7 @@ Start here. Facts marked "verified" were measured on the real board on 2026-10-1
 | 03 | [03-esp-idf-environment.md](03-esp-idf-environment.md) | toolchain paths, build/flash commands, IDF v6 changes, sdkconfig for this board |
 | 04 | [04-esp-modem-ppp.md](04-esp-modem-ppp.md) | esp_modem + PPP: correct DTE config, startup sequence, CMUX, robustness |
 | 05 | [05-server-contract.md](05-server-contract.md) | endpoints, cert chain, Mosquitto ACL, probe MQTT/HTTPS protocol, cookie + Origin rules |
-| 06 | [06-probe-plan-and-open-questions.md](06-probe-plan-and-open-questions.md) | what is proven, suggested firmware layout, open questions, risks |
+| 06 | [06-probe-plan-and-open-questions.md](06-probe-plan-and-open-questions.md) | what is proven (incl. the probe firmware), firmware layout, decisions, risks |
 | — | [SOURCES.md](SOURCES.md) | where every fact came from (local repos, PDFs, web) |
 | — | [../tools/README.md](../tools/README.md) | AT bridge firmware, AT script, PPP smoke test |
 
@@ -27,6 +27,8 @@ Data path  esp_modem 2.1.0 PPP (ESP_MODEM_DCE_SIM7600) + mbedTLS + espressif/mqt
 Server     https://api.rmx.lt/probe/…  ·  mqtts://mqtt.rmx.lt:8883 (login required, client id := username)
 Trust      ISRG Root X1 + X2 (LE Gen-Y ECDSA chain); SNI required for api.rmx.lt
 Proven     PPP → HTTPS 200 /probe/health → MQTTS CONNACK (fake login refused) — tools/ppp_smoke
+Firmware   main/ (repo root): login probe-device on MQTT + HTTPS, create/list both ways — verified
+Logins     MQTT probe-device, web probe-device; passwords only in gitignored sdkconfig
 ```
 
 ## Local reference material
