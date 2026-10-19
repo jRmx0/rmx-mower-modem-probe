@@ -36,17 +36,21 @@ tools\mqtt_cmd.ps1 ping
 tools\mqtt_cmd.ps1 status
 tools\mqtt_cmd.ps1 create -Value "hello from the PC"
 tools\mqtt_cmd.ps1 https_create -Value "via HTTPS"
+tools\mqtt_cmd.ps1 create -Gps          # value = GPS location, or "gps unavailable: <why>"
+tools\mqtt_cmd.ps1 https_create -Gps
 tools\mqtt_cmd.ps1 delete -RecordId 41
 tools\mqtt_cmd.ps1 restart
 ```
 
 Commands: `ping status create list delete https_create https_list restart`. Each carries
-`expires_at` (now + `-TtlS`, default 60 s). Needs the Mosquitto clients for Windows and `ssh rmx-vps`.
+`expires_at` (now + `-TtlS`, default 60 s). `-Gps` (create / https_create) sends the device's
+GNSS location instead of a value; without a fix it sends `gps unavailable: …` and says why.
+Needs the Mosquitto clients for Windows and `ssh rmx-vps`.
 
 ## Layout
 
 ```
-main/        the probe firmware: board, cell (esp_modem PPP), mqtt_link, https_api, probe_proto, remote_cmd
+main/        the probe firmware: board, cell (esp_modem PPP), mqtt_link, https_api, probe_proto, remote_cmd, gnss
 knowledge/   knowledge base about the board, modem, ESP-IDF, esp_modem and the server contract
              → start with knowledge/INDEX.md
 tools/       at_bridge (AT console firmware), at_session.py (AT script), ppp_smoke (PPP + TLS test)

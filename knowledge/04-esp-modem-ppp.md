@@ -77,6 +77,24 @@ Useful C API calls: `esp_modem_sync`, `esp_modem_get_signal_quality`, `esp_modem
 `esp_modem_read_pin`/`set_pin`, `esp_modem_at(dce, "AT+CPSI?", out, timeout)` (raw AT),
 `esp_modem_pause_net(dce, true/false)` (temporarily leave PPP to send AT), `esp_modem_destroy`.
 
+## AT commands while online: `esp_modem_pause_net()` (chosen, verified 2026-10-20)
+
+The probe firmware uses `esp_modem_pause_net(dce, true)` → AT commands → `esp_modem_pause_net(dce, false)`,
+wrapped in `cell_with_command_mode()` (`main/cell.c`) with a mutex shared with the redial watchdog.
+What it does inside esp_modem 2.1.0: stop feeding lwIP frames to the UART, wait 1 s (escape guard
+time), send `+++` (expects `OK`/`NO CARRIER`), then later `ATO` (expects `CONNECT`) and resume.
+
+Measured: `+++` ~1.9–2.0 s (incl. the 1 s guard), GNSS AT commands 30–50 ms, `ATO` ~10 ms.
+PPP resumed every time (4 sessions); the MQTT link and the HTTPS keep-alive connection survived:
+the probe-server request right after the pause answered in ~400 ms. No reconnect in the log.
+If `ATO` failed, the code puts the DCE into command mode and lets the watchdog redial (untested).
+`esp_modem_at()` returns the last response line before `OK` (truncated to
+`CONFIG_ESP_MODEM_C_API_STR_MAX` = 128 chars).
+
+Why not CMUX: untested on this board, it changes how the whole DTE/redial path works
+(mode transitions, exit issues reported on SIMCom 76xx), and GPS is read only on demand, so a
+2 s pause per read is cheap. Revisit CMUX if AT is needed often (e.g. periodic GNSS + signal).
+
 ## AT commands while online: CMUX
 
 `AT+CMUX=?` → `(0),(0),(1-8),(1-1500),…` — basic-mode CMUX works on the SIM7600.

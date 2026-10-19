@@ -122,11 +122,38 @@ Note: the URL is always `tcp://` even for TLS; TLS is selected by ACCQ's 3rd arg
 | `AT+CNBP?` | band masks |
 | `AT+CMUX=?` | `(0),(0),(1-8),(1-1500),…` — basic mode CMUX supported |
 | `AT+CSSLCFG=?` | lists TLS options (sslversion 0-4, authmode 0-3, SNI, ciphersuites 0x002F/0xFFFF) |
-| `AT+CGPS=1` / `AT+CGPSINFO` | GNSS on / fix (needs active GPS antenna); `+CGPS: 0,1` = off |
+| `AT+CGPS=1` / `AT+CGPSINFO` | GNSS on / fix (needs active GPS antenna); `+CGPS: 0,1` = off. See "GNSS" below |
 | `AT+CTZU=1`, `AT+CCLK?` | network time |
 | `AT+CNTP="pool.ntp.org",0` + `AT+CNTP` | NTP sync in the modem (not tested) |
 | `AT&W` | save settings |
 | `AT+CRESET` | reboot the modem (not tested) |
+
+## GNSS (probe firmware `main/gnss.c`, verified 2026-10-20)
+
+Read while PPP is paused for ~2 s (see 04, "AT commands while online"). Sequence:
+
+```
+AT+CGPS?            → +CGPS: 0,1   (off after a modem power-up; 1,1 = on)
+AT+CVAUXV=2800      → OK           active-antenna supply (LilyGo: SIM7600 boards feed the
+AT+CVAUXS=1         → OK           GPS antenna from VDD_AUX, "GPIO 127" in TinyGSM)
+AT+CGPS=1           → OK           (ERROR if it is already on: check CGPS? first)
+AT+CGNSSINFO        → +CGNSSINFO: ,,,,,,,,,,,,,,,      no fix (all fields empty)
+                    → +CGNSSINFO: <mode 2|3>,<GPS-SVs>,<GLONASS-SVs>,<BEIDOU-SVs>,<lat ddmm.mmmmmm>,<N/S>,
+                      <lon dddmm.mmmmmm>,<E/W>,<ddmmyy>,<hhmmss.s UTC>,<alt m>,<speed>,<course>,<PDOP>,<HDOP>,<VDOP>
+```
+
+- Verified: GNSS off at boot → `AT+CGPS=1` OK; `AT+CGNSSINFO` answered in ~30 ms with the
+  empty no-fix line; the GNSS stays on in the modem across ESP resets (the modem keeps running).
+- **Fix verified 2026-10-20**: GPS antenna connected. Indoors (away from windows): no fix after
+  18 min (1100 s). Moved to a window / outside: fix right away (GNSS had been on ~25 min),
+  `+CGNSSINFO` parsed into lat/lon/alt/UTC, **12 sats, HDOP 1.0**, UTC matched the clock. The modem
+  reported mode `2` (2D) even with 12 sats and an altitude, so don't treat "2D" as poor.
+- The parser (field layout above, from the SIMCom AT manual / TinyGSM) finds the latitude by its `N`/`S` neighbour, so an extra SV-count field is tolerated.
+  Host-tested (gcc, stubbed `cell_at`) with the SIMCom manual's example line
+  `2,09,05,00,3113.330650,N,12121.262554,E,131117,091918.0,32.9,…` → lat 31.222177, lon 121.354376,
+  2D, 14 sats, `2017-11-13T09:19:18Z`, and with S/W hemispheres + an extra SV field.
+- No AT command reports a missing antenna: "no fix" is all you get.
+- Cold start outdoors with a clear sky: typically 30–60 s (SIMCom); indoors often never.
 
 ## Known quirks
 

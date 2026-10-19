@@ -21,6 +21,7 @@
 #include "nvs_flash.h"
 #include "board.h"
 #include "cell.h"
+#include "gnss.h"
 #include "https_api.h"
 #include "mqtt_link.h"
 #include "probe_proto.h"
@@ -142,6 +143,8 @@ void app_main(void)
     } else {
         ESP_LOGW(TAG, "SNTP: no time yet (commands with expires_at are refused until it syncs)");
     }
+
+    gnss_start();   /* the first fix takes a while: start searching early */
 
     int failures = self_test_https();
     https_api_close();   /* frees the TLS session (~40 KB); MQTT keeps its own */

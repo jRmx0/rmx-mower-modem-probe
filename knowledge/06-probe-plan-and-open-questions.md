@@ -57,12 +57,25 @@ PC sender: `tools/mqtt_cmd.ps1` (login `app`, the backend role, via `mosquitto_r
   closed after the self-test). After `restart` the device was back and answering in ~30 s.
 - Commands run on their own task (queue of 4): the MQTT task must never block, because a
   forwarded request waits for its response on that same task.
+- `"gps": true` on `create` / `https_create` (`tools/mqtt_cmd.ps1 -Gps`, verified 2026-10-20): the value
+  sent is the GNSS location as a JSON string, e.g.
+  `{"gps":"fix","lat":…,"lon":…,"alt":…,"utc":"2026-10-20T09:19:18Z","sats":9,"hdop":0.8,"mode":"3D"}`,
+  or `gps unavailable: <why>` (no fix (searching N s), GNSS was off / turned on now, AT+CGPS? / AT+CGNSSINFO
+  error|timeout, PPP down, modem busy, +++ failed). The ack `result` gets `"gps"` (the status) and
+  `"gps_fix"`. `gps` together with `value` → `bad_request`. Code: `main/gnss.c`; AT access by pausing PPP
+  for ~2 s (04). GNSS is turned on at boot (`gnss_start()`).
+  Verified: no-fix path over MQTT (record 50, 52) and HTTPS (record 51), records on the server hold
+  `gps unavailable: no fix (searching 20 s)`; MQTT/PPP stayed up; `create` with gps ~2.2–2.3 s on the
+  device, `https_create` ~5.6 s (new TLS). Fix path verified the same day with the board at a
+  window: `create` → record 60, `https_create` → record 61, both with the JSON location (12 sats,
+  HDOP 1.0), ack `"gps_fix":true,"gps":"fix (2D, 12 sats, <utc>)"`, ~2.2 s / ~5.8 s on the device.
+  Indoors (antenna connected): no fix after 18 min (record 54).
 - `mosquitto_rr` 2.0.20 has no `-f`; it silently sent an empty payload. Use `-m` (quote-escaped).
 - Using `app` from the PC: on 8883 its client id is forced to `app`, so a real backend on that
   login would be kicked while the script runs (no backend runs yet).
 
 Not yet done: reconnect handling verified under real signal loss (the code redials and
-power-cycles the modem, untested), CMUX, sleep/power saving, modem MQTT AT path, GNSS,
+power-cycles the modem, untested), CMUX, sleep/power saving, modem MQTT AT path,
 OTA, secrets in NVS instead of sdkconfig, SNTP + certificate date checks.
 
 ## Firmware structure (implemented)
@@ -73,6 +86,8 @@ main/
   cell.c/.h         esp_modem DTE/DCE, registration wait, PPP up/down, reconnect loop, events
   mqtt_link.c/.h    esp-mqtt client: mqtts://mqtt.rmx.lt:8883, LWT, subscribe, request/response
   https_api.c/.h    esp_http_client: login (cookie + Origin), records CRUD
+  gnss.c/.h         SIM7600 GNSS over AT (via cell_with_command_mode): on at boot, read on demand
+  remote_cmd.c/.h   commands from mower/<user>/cmd, acks on …/cmd/ack
   probe_proto.c/.h  JSON envelopes (espressif/cjson), request_id generation
   app_main.c        sequence: board → cell → https test → mqtt test → loop
 idf_component.yml   espressif/esp_modem ^2.1, espressif/mqtt ^1.1, espressif/cjson ^1.7.19

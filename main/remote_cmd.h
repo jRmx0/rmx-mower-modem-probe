@@ -4,6 +4,9 @@
  *   cmd: ping | status | create (value) | list | delete (record_id) |
  *        https_create (value) | https_list | restart
  *   expires_at: optional unix time (s); expired or unclocked commands are refused.
+ *   gps: optional, create/https_create only: true sends the GNSS location as
+ *        the value (or "gps unavailable: <why>"); the ack result gets
+ *        "gps" (status) and "gps_fix". Not together with value.
  * Reply:   {"id":"c1","cmd":"ping","ok":true,"result":{...},"ms":12}
  *          {"id":"c1","cmd":"x","ok":false,"error":"<code>","message":"..."}
  */
