@@ -10,12 +10,28 @@ to **rmx-server** and talks to **rmx-backend-probe** with **MQTT over TLS** and 
 
 ## Status
 
-Research phase done. Verified on the hardware: PPP over LTE, HTTPS to `/probe/health`
-(200), MQTT over TLS to the broker (TLS + CONNECT OK). The probe firmware itself is next.
+Probe firmware working on the hardware (2026-10-19): over LTE (PPP) it logs in to the
+broker as `probe-device`, sends `create`/`list` on `probe/req/probe-device` and gets the
+answers on `probe/res/probe-device`; over HTTPS it logs in (session cookie + `Origin`)
+and creates/lists records. Details: [knowledge/06](knowledge/06-probe-plan-and-open-questions.md).
+
+## Build, configure, flash (PowerShell)
+
+```powershell
+. C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1
+idf.py set-target esp32     # first time only
+idf.py menuconfig           # "rmx probe": APN, MQTT and web logins (passwords stay in sdkconfig)
+idf.py build
+idf.py -p COM6 -b 921600 flash
+python -I -u tools\serial_log.py COM6 120 --until SELF-TEST
+```
+
+`sdkconfig` holds the passwords and is gitignored: never commit it.
 
 ## Layout
 
 ```
+main/        the probe firmware: board, cell (esp_modem PPP), mqtt_link, https_api, probe_proto
 knowledge/   knowledge base about the board, modem, ESP-IDF, esp_modem and the server contract
              → start with knowledge/INDEX.md
 tools/       at_bridge (AT console firmware), at_session.py (AT script), ppp_smoke (PPP + TLS test)

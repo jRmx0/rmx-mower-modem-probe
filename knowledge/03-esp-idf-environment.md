@@ -68,6 +68,8 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
 ```
 
 Notes:
+- The probe firmware uses [`partitions.csv`](../partitions.csv): NVS 24 KB, otadata, two
+  **4 MB OTA slots**, ~7.9 MB `storage`. Its image is 833 KB (2026-10-19).
 - The default partition table has a **1 MB** factory app. The smoke test
   (esp_modem + PPP + esp_http_client + esp-mqtt + full cert bundle) is already
   **808 KB** (`idf.py size`). For the real firmware use a custom partition table
