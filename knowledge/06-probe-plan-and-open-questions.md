@@ -66,14 +66,16 @@ PC sender: `tools/mqtt_cmd.ps1` (login `app`, the backend role, via `mosquitto_r
   for ~2 s (04). GNSS is turned on at boot (`gnss_start()`).
   Verified: no-fix path over MQTT (record 50, 52) and HTTPS (record 51), records on the server hold
   `gps unavailable: no fix (searching 20 s)`; MQTT/PPP stayed up; `create` with gps ~2.2–2.3 s on the
-  device, `https_create` ~5.6 s (new TLS). **Fix path not verified yet**: GPS antenna connected but the board
-  is indoors: no fix after 18 min (record 54).
+  device, `https_create` ~5.6 s (new TLS). Fix path verified the same day with the board at a
+  window: `create` → record 60, `https_create` → record 61, both with the JSON location (12 sats,
+  HDOP 1.0), ack `"gps_fix":true,"gps":"fix (2D, 12 sats, <utc>)"`, ~2.2 s / ~5.8 s on the device.
+  Indoors (antenna connected): no fix after 18 min (record 54).
 - `mosquitto_rr` 2.0.20 has no `-f`; it silently sent an empty payload. Use `-m` (quote-escaped).
 - Using `app` from the PC: on 8883 its client id is forced to `app`, so a real backend on that
   login would be kicked while the script runs (no backend runs yet).
 
 Not yet done: reconnect handling verified under real signal loss (the code redials and
-power-cycles the modem, untested), CMUX, sleep/power saving, modem MQTT AT path, a real GNSS fix,
+power-cycles the modem, untested), CMUX, sleep/power saving, modem MQTT AT path,
 OTA, secrets in NVS instead of sdkconfig, SNTP + certificate date checks.
 
 ## Firmware structure (implemented)
