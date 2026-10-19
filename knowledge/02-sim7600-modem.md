@@ -144,8 +144,8 @@ AT+CGNSSINFO        → +CGNSSINFO: ,,,,,,,,,,,,,,,      no fix (all fields empt
 
 - Verified: GNSS off at boot → `AT+CGPS=1` OK; `AT+CGNSSINFO` answered in ~30 ms with the
   empty no-fix line; the GNSS stays on in the modem across ESP resets (the modem keeps running).
-- **No fix yet on our board**: still none after 4.5 min (2026-10-20, board indoors; whether the
-  GPS antenna is connected was not checked). The fix branch of the parser
+- **No fix yet on our board**: GPS antenna connected, board indoors → still no fix after
+  18 min (1100 s) of searching (2026-10-20). Needs a test near a window / outdoors. The fix branch of the parser
   (field layout above, from the SIMCom AT manual / TinyGSM) is **not yet verified on hardware**:
   the parser finds the latitude by its `N`/`S` neighbour, so an extra SV-count field is tolerated.
   Host-tested (gcc, stubbed `cell_at`) with the SIMCom manual's example line
