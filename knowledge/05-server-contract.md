@@ -56,7 +56,9 @@ CN=api.rmx.lt / CN=mqtt.rmx.lt     ECDSA P-256 leaf, valid 2026-10-15 … 2027-0
   - `user app` → `mower/#` (backend).
   - `user probe-app` → `probe/#` (probe server).
   - `user probe-web` → write `probe/req/+`, read `probe/res/+`, `probe/events/#`, `probe/status/#`.
-- Logins that exist: `app`, `mower-01`, `probe-app`, `probe-web`. Passwords live only on the
+  - `user probe-device` (added 2026-10-19, for this firmware) → write `probe/req/probe-device`,
+    read `probe/res/probe-device`, `probe/events/#`, `probe/status/#`.
+- Logins that exist: `app`, `mower-01`, `probe-app`, `probe-web`, `probe-device`. Passwords live only on the
   server (`services/mosquitto/data/credentials.txt`, root 0600). **Never print or commit them.**
   The user must provide the device's password (e.g. via `menuconfig`/NVS, not committed).
 - Mosquitto accepts a SUBSCRIBE to a forbidden topic but never delivers to it (no error!).
@@ -94,8 +96,8 @@ HTTPS REST, WSS and MQTT. Every change is pushed to all clients.
   On 8883 the client id is forced to the username, so with `probe-web` the device
   publishes on `probe/req/probe-web` and subscribes `probe/res/probe-web`,
   `probe/events/records`, `probe/status/server`. (`mower-01` can't reach `probe/#`.)
-  ⚠️ Open decision for the user: reuse `probe-web` or add a dedicated device login
-  (e.g. a `probe-device` user with the same ACL as `probe-web`) on the VPS.
+  **Decided 2026-10-19:** the device uses its own login `probe-device` (topics
+  `probe/req|res/probe-device`); verified on hardware.
 - Requests (`crates/probe-protocol`):
 
 ```jsonc
@@ -149,5 +151,8 @@ Device rules for HTTPS (the API was built for browsers):
    fine, but failed logins back off (5 free failures per username, 20 per IP, then 1 s … 15 min;
    all devices on a carrier CGNAT may share an IP).
 5. `Content-Type: application/json` for bodies. Errors come as `{"code","message"}`.
-6. Server records the transport: HTTPS-created rows have `connection_type: "https"`,
+6. The device's web user is `probe-device` (created 2026-10-19). Verified on hardware:
+   login → 200 `{"username":"probe-device"}` + cookie, create → 201, list → 200.
+   Records also carry `created_ip` (the client's public IP for REST; `null` over MQTT).
+7. Server records the transport: HTTPS-created rows have `connection_type: "https"`,
    MQTT ones `"mqtt"`. That's how the probe shows which path the device used.
