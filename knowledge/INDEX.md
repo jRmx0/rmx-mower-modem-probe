@@ -29,6 +29,7 @@ Trust      ISRG Root X1 + X2 (LE Gen-Y ECDSA chain); SNI required for api.rmx.lt
 Proven     PPP → HTTPS 200 /probe/health → MQTTS CONNACK (fake login refused) — tools/ppp_smoke
 Firmware   main/ (repo root): login probe-device on MQTT + HTTPS, create/list both ways — verified
 Logins     MQTT probe-device, web probe-device; passwords only in gitignored sdkconfig
+Commands   PC → mower/probe-device/cmd → device → …/cmd/ack (tools/mqtt_cmd.ps1, login app) — verified
 ```
 
 ## Local reference material
