@@ -12,6 +12,7 @@
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "cell.h"
+#include "gnss.h"
 #include "https_api.h"
 #include "mqtt_link.h"
 #include "probe_proto.h"
@@ -21,6 +22,7 @@ static const char *TAG = "cmd";
 #define MAX_CMD     2048
 #define SEEN_IDS    8
 #define ID_LEN      64
+#define GPS_VALUE_LEN 256   /* the server allows 1000 */
 
 static QueueHandle_t s_queue;
 
@@ -135,6 +137,16 @@ static void run_https(cJSON *reply, bool create, const char *value)
     set_error(reply, "failed", "HTTPS request failed (see the device log)");
 }
 
+/* "gps": true replaces the value with the location (or why there is none)
+ * and echoes the GPS status in the ack. */
+static void add_gps_status(cJSON *reply, bool fix, const char *status)
+{
+    cJSON *res = cJSON_GetObjectItem(reply, "result");
+    cJSON *to = res ? res : reply;
+    cJSON_AddBoolToObject(to, "gps_fix", fix);
+    cJSON_AddStringToObject(to, "gps", status);
+}
+
 static void add_status(cJSON *reply)
 {
     cJSON_AddBoolToObject(reply, "ok", true);
@@ -159,6 +171,8 @@ static void handle(const char *json, size_t len)
     const char *value = cJSON_GetStringValue(value_item);   /* NULL for null/absent */
     const cJSON *record_id = cJSON_GetObjectItem(cmd, "record_id");
     const cJSON *expires_at = cJSON_GetObjectItem(cmd, "expires_at");
+    const cJSON *gps_item = cJSON_GetObjectItem(cmd, "gps");
+    bool gps = cJSON_IsTrue(gps_item);
 
     cJSON *reply = cJSON_CreateObject();
     cJSON_AddStringToObject(reply, "id", id ? id : "");
@@ -180,6 +194,19 @@ static void handle(const char *json, size_t len)
         set_error(reply, "expired", "command expired before it arrived");
     } else if (value_item && !cJSON_IsString(value_item) && !cJSON_IsNull(value_item)) {
         set_error(reply, "bad_request", "value must be a string or null");
+    } else if (gps_item && !cJSON_IsBool(gps_item)) {
+        set_error(reply, "bad_request", "gps must be true or false");
+    } else if (gps && value) {
+        set_error(reply, "bad_request", "use either value or gps, not both");
+    } else if (gps && (strcmp(name, "create") == 0 || strcmp(name, "https_create") == 0)) {
+        char loc[GPS_VALUE_LEN], status[GPS_VALUE_LEN];
+        bool fix = gnss_read(loc, sizeof(loc), status, sizeof(status));
+        if (name[0] == 'c') {
+            run_probe_request(reply, PROBE_OP_CREATE, 0, loc);
+        } else {
+            run_https(reply, true, loc);
+        }
+        add_gps_status(reply, fix, status);
     } else if (strcmp(name, "ping") == 0) {
         cJSON_AddBoolToObject(reply, "ok", true);
         cJSON_AddStringToObject(cJSON_AddObjectToObject(reply, "result"), "pong", "probe-device");

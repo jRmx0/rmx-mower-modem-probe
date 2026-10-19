@@ -1,7 +1,9 @@
 #include "cell.h"
 
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_event.h"
@@ -20,6 +22,8 @@ static const char *TAG = "cell";
 static EventGroupHandle_t s_ev;
 static esp_modem_dce_t *s_dce;
 static int s_rssi = 99;
+/* One user of the modem's command channel at a time: redial vs. AT sessions. */
+static SemaphoreHandle_t s_lock;
 
 static void on_ip(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
@@ -119,8 +123,11 @@ static void watchdog_task(void *arg)
         int failures = 0;
         while (!cell_is_up()) {
             ESP_LOGW(TAG, "redialing (attempt %d)", failures + 1);
+            xSemaphoreTake(s_lock, portMAX_DELAY);
             esp_modem_set_mode(s_dce, ESP_MODEM_MODE_COMMAND);
-            if (dial(60000) == ESP_OK) {
+            esp_err_t err = dial(60000);
+            xSemaphoreGive(s_lock);
+            if (err == ESP_OK) {
                 break;
             }
             if (++failures % 5 == 0) {
@@ -136,6 +143,7 @@ static void watchdog_task(void *arg)
 esp_err_t cell_start(int timeout_ms)
 {
     s_ev = xEventGroupCreate();
+    s_lock = xSemaphoreCreateMutex();
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, on_ip, NULL));
 
     esp_modem_dte_config_t dte = ESP_MODEM_DTE_DEFAULT_CONFIG();
@@ -189,6 +197,64 @@ int cell_last_rssi(void)
 void cell_stop(void)
 {
     if (s_dce) {
+        xSemaphoreTake(s_lock, pdMS_TO_TICKS(15000));
         esp_modem_set_mode(s_dce, ESP_MODEM_MODE_COMMAND);
     }
+}
+
+esp_err_t cell_with_command_mode(cell_cmd_fn fn, void *ctx, int wait_ms)
+{
+    if (!cell_is_up()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (xSemaphoreTake(s_lock, pdMS_TO_TICKS(wait_ms)) != pdTRUE) {
+        return ESP_ERR_TIMEOUT;
+    }
+    if (!cell_is_up()) {
+        xSemaphoreGive(s_lock);
+        return ESP_ERR_INVALID_STATE;
+    }
+    int64_t t0 = esp_timer_get_time();
+    /* Stops PPP output, waits 1 s (guard time), sends "+++" -> OK. The PPP
+     * session stays alive in the modem; TCP retransmits cover the gap. */
+    if (esp_modem_pause_net(s_dce, true) != ESP_OK) {
+        ESP_LOGW(TAG, "could not leave data mode (+++), resuming PPP");
+        esp_modem_pause_net(s_dce, false);
+        xSemaphoreGive(s_lock);
+        return ESP_ERR_NOT_FINISHED;
+    }
+    int64_t t1 = esp_timer_get_time();
+    esp_err_t err = fn(ctx);
+    int ber = 99;
+    esp_modem_get_signal_quality(s_dce, &s_rssi, &ber);   /* free while we are here */
+    int64_t t2 = esp_timer_get_time();
+
+    esp_err_t back = esp_modem_pause_net(s_dce, false);   /* ATO -> CONNECT */
+    if (back != ESP_OK) {
+        vTaskDelay(pdMS_TO_TICKS(500));
+        back = esp_modem_pause_net(s_dce, false);
+    }
+    if (back != ESP_OK) {
+        /* PPP is gone: let the watchdog redial from command mode. */
+        ESP_LOGE(TAG, "ATO failed, PPP lost; redialing");
+        esp_modem_set_mode(s_dce, ESP_MODEM_MODE_COMMAND);
+        xEventGroupClearBits(s_ev, GOT_IP);
+        xEventGroupSetBits(s_ev, LOST_IP);
+        board_led(false);
+    }
+    ESP_LOGI(TAG, "AT session: +++ %lld ms, commands %lld ms, ATO %lld ms (%s)",
+             (t1 - t0) / 1000, (t2 - t1) / 1000, (esp_timer_get_time() - t2) / 1000,
+             back == ESP_OK ? "PPP resumed" : "PPP lost");
+    xSemaphoreGive(s_lock);
+    return err;
+}
+
+esp_err_t cell_at(const char *cmd, char *out, size_t out_len, int timeout_ms)
+{
+    char buf[CONFIG_ESP_MODEM_C_API_STR_MAX] = {0};
+    esp_err_t err = esp_modem_at(s_dce, cmd, buf, timeout_ms);
+    if (out && out_len) {
+        strlcpy(out, buf, out_len);
+    }
+    return err;
 }
