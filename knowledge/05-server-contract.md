@@ -76,6 +76,9 @@ CN=api.rmx.lt / CN=mqtt.rmx.lt     ECDSA P-256 leaf, valid 2026-10-15 … 2027-0
 
 Safety: the mower stops on its own when the link or acks are lost; never rely on the server.
 
+The probe device already uses `mower/probe-device/cmd` → `…/cmd/ack` and `…/status`
+(format in [06](06-probe-plan-and-open-questions.md), "Remote commands").
+
 ## rmx-backend-probe protocol (the probe target)
 
 The probe server is a CRUD demo on a `records(time, connection_type, value)` table, over

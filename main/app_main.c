@@ -3,9 +3,11 @@
  * rmx-backend-probe over LTE.
  *
  * board -> cell (PPP) -> HTTPS (health, login, create, list) -> MQTT
- * (connect, create + list over probe/req|res/<user>) -> stay online.
+ * (connect, create + list over probe/req|res/<user>) -> stay online and run
+ * remote commands from mower/<user>/cmd (see remote_cmd.h).
  */
 #include <stdio.h>
+#include <time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_app_desc.h"
@@ -13,6 +15,7 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_netif_sntp.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "nvs_flash.h"
@@ -21,6 +24,7 @@
 #include "https_api.h"
 #include "mqtt_link.h"
 #include "probe_proto.h"
+#include "remote_cmd.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "probe";
@@ -130,8 +134,18 @@ void app_main(void)
         esp_restart();
     }
 
+    /* Clock for command expiry (expires_at) and TLS logs; not fatal if it fails. */
+    esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+    esp_netif_sntp_init(&sntp);
+    if (esp_netif_sntp_sync_wait(pdMS_TO_TICKS(15000)) == ESP_OK) {
+        ESP_LOGI(TAG, "clock set by SNTP: %lld", (long long)time(NULL));
+    } else {
+        ESP_LOGW(TAG, "SNTP: no time yet (commands with expires_at are refused until it syncs)");
+    }
+
     int failures = self_test_https();
     https_api_close();   /* frees the TLS session (~40 KB); MQTT keeps its own */
+    ESP_ERROR_CHECK(remote_cmd_init());
     failures += self_test_mqtt();
     ESP_LOGI(TAG, "SELF-TEST %s (%d failure%s), free heap %u, min %u, internal %u",
              failures ? "FAILED" : "PASSED", failures, failures == 1 ? "" : "s",

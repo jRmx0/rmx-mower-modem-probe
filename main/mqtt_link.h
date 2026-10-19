@@ -5,8 +5,16 @@
 #include "esp_err.h"
 #include "probe_proto.h"
 
+/* Called on the MQTT task for each message on mower/<user>/cmd. Must not
+ * block: hand the work to another task. */
+typedef void (*mqtt_link_cmd_cb_t)(const char *data, size_t len);
+
+/* Set before mqtt_link_start(). */
+void mqtt_link_set_cmd_handler(mqtt_link_cmd_cb_t cb);
+
 /* Starts the client (auto-reconnect) and subscribes probe/res/<user>,
- * probe/events/records and probe/status/server on every connect. */
+ * probe/events/records, probe/status/server and (with a cmd handler)
+ * mower/<user>/cmd on every connect. */
 esp_err_t mqtt_link_start(void);
 
 /* Waits until connected and probe/res/<user> is subscribed. */
@@ -16,5 +24,8 @@ bool mqtt_link_wait_ready(int timeout_ms);
  * response on probe/res/<user>. One request at a time. */
 esp_err_t mqtt_link_request(probe_op_t op, int64_t id, const char *value,
                             probe_result_t *out, int timeout_ms);
+
+/* Publishes a reply on mower/<user>/cmd/ack (QoS 1). */
+esp_err_t mqtt_link_send_ack(const char *json);
 
 void mqtt_link_stop(void);
