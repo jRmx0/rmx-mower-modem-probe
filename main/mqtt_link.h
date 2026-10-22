@@ -25,6 +25,9 @@ bool mqtt_link_wait_ready(int timeout_ms);
 esp_err_t mqtt_link_request(probe_op_t op, int64_t id, const char *value,
                             probe_result_t *out, int timeout_ms);
 
+/* Publishes on mower/<user>/<subtopic> (QoS 1), e.g. "firmware". */
+esp_err_t mqtt_link_publish_own(const char *subtopic, const char *payload, bool retain);
+
 /* Publishes a reply on mower/<user>/cmd/ack (QoS 1). */
 esp_err_t mqtt_link_send_ack(const char *json);
 

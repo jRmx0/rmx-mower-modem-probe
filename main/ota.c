@@ -16,6 +16,7 @@
 #include "esp_timer.h"
 #include "cell.h"
 #include "mqtt_link.h"
+#include "probe_proto.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "ota";
@@ -36,6 +37,7 @@ static ota_req_t s_req;
 static volatile bool s_busy;
 static esp_timer_handle_t s_confirm_timer;
 static bool s_pending_verify;
+static bool s_report_pending;   /* confirmed an OTA image, server not told yet */
 
 /* Last attempt since boot, for the status command */
 static const char *volatile s_state = "idle";   /* idle, downloading, done, failed */
@@ -323,6 +325,7 @@ void ota_confirm(void)
     }
     if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) {
         s_pending_verify = false;
+        s_report_pending = true;
         ESP_LOGI(TAG, "image %s confirmed", esp_app_get_description()->version);
     }
 }
@@ -347,5 +350,46 @@ void ota_add_status(cJSON *res)
     }
     if (s_error[0]) {
         cJSON_AddStringToObject(ota, "error", s_error);
+    }
+}
+
+void ota_report_update(void)
+{
+    if (!s_report_pending || !mqtt_link_wait_ready(0)) {
+        return;
+    }
+    const char *version = esp_app_get_description()->version;
+    const char *partition = esp_ota_get_running_partition()->label;
+    /* The image we came from is still in the other slot */
+    char previous[VERSION_LEN] = "unknown";
+    esp_app_desc_t desc;
+    const esp_partition_t *other = esp_ota_get_next_update_partition(NULL);
+    if (other && esp_ota_get_partition_description(other, &desc) == ESP_OK) {
+        snprintf(previous, sizeof(previous), "%s", desc.version);
+    }
+
+    cJSON *msg = cJSON_CreateObject();
+    cJSON_AddStringToObject(msg, "version", version);
+    cJSON_AddStringToObject(msg, "previous", previous);
+    cJSON_AddStringToObject(msg, "partition", partition);
+    if (clock_valid()) {
+        cJSON_AddNumberToObject(msg, "time", (double)time(NULL));
+    }
+    char *json = cJSON_PrintUnformatted(msg);
+    cJSON_Delete(msg);
+    if (!json || mqtt_link_publish_own("firmware", json, true) != ESP_OK) {
+        free(json);
+        return;   /* try again on the next call */
+    }
+    free(json);
+    s_report_pending = false;
+
+    char value[128];
+    snprintf(value, sizeof(value), "firmware updated to %s (from %s, %s)", version, previous, partition);
+    probe_result_t r;
+    if (mqtt_link_request(PROBE_OP_CREATE, 0, value, &r, 30000) == ESP_OK && r.ok) {
+        ESP_LOGI(TAG, "server told: %s (record %lld)", value, r.id);
+    } else {
+        ESP_LOGW(TAG, "update record not created (the retained firmware message went out)");
     }
 }

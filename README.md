@@ -61,6 +61,9 @@ The device downloads a new image over HTTPS into the spare app slot (`partitions
   and USB flashing works as before.
 - **Hosting.** `https://api.rmx.lt/fw/probe/<version>.bin` on the VPS (Caddy, HTTP basic
   auth, rmx-vps README). Only URLs under `CONFIG_PROBE_OTA_URL_PREFIX` are accepted.
+- **Report.** Once a new image has confirmed itself, it tells the server once: a retained
+  `{"version","previous","partition","time"}` on `mower/probe-device/firmware`, and a probe
+  record `firmware updated to <version> (from <previous>, <slot>)`.
 - **Retries.** A dropped download resumes where it stopped (HTTP Range), up to 3 times; the
   running firmware is untouched until the whole image checks out.
 

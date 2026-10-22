@@ -237,6 +237,21 @@ esp_err_t mqtt_link_request(probe_op_t op, int64_t id, const char *value,
     return err;
 }
 
+esp_err_t mqtt_link_publish_own(const char *subtopic, const char *payload, bool retain)
+{
+    if (!s_client) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    char topic[96];
+    snprintf(topic, sizeof(topic), "mower/%s/%s", CONFIG_PROBE_MQTT_USERNAME, subtopic);
+    if (esp_mqtt_client_publish(s_client, topic, payload, 0, 1, retain) < 0) {
+        ESP_LOGE(TAG, "publish on %s failed", topic);
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "-> %s %s", topic, payload);
+    return ESP_OK;
+}
+
 esp_err_t mqtt_link_send_ack(const char *json)
 {
     if (!s_client) {
