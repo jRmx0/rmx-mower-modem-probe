@@ -30,7 +30,7 @@ Proven     PPP → HTTPS 200 /probe/health → MQTTS CONNACK (fake login refused
 Firmware   main/ (repo root): login probe-device on MQTT + HTTPS, create/list both ways — verified
 Logins     MQTT probe-device, web probe-device; passwords only in gitignored sdkconfig
 Commands   PC → mower/probe-device/cmd → device → …/cmd/ack (tools/mqtt_cmd.ps1, login app) — verified
-OTA        `ota` command → api.rmx.lt/fw/probe/<ver>.bin, signed (RSA-3072, no Secure Boot), rollback — built, not yet on hardware
+OTA        `ota` command → api.rmx.lt/fw/probe/<ver>.bin, signed (RSA-3072, no Secure Boot), rollback — 0.2.0 → 0.2.1 over LTE verified 2026-10-22 (~3 min)
 GNSS       "gps": true on create/https_create; AT via esp_modem_pause_net (~2 s, links survive) — fix and no-fix verified
 ```
 
