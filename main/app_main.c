@@ -94,6 +94,7 @@ static int self_test_mqtt(void)
     }
     ESP_LOGI(TAG, "TEST mqtt connect: PASS");
     ota_confirm();   /* a new image that reaches the broker is good */
+    ota_report_update();
 
     snprintf(value, sizeof(value), "mqtt from T-SIM7600, uptime %lld s, rssi %d",
              esp_timer_get_time() / 1000000, cell_last_rssi());
@@ -164,6 +165,7 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(60000));
         if (mqtt_link_wait_ready(0)) {
             ota_confirm();   /* MQTT came up after the self-test */
+            ota_report_update();
         }
         ESP_LOGI(TAG, "alive: ppp %s, rssi %d, free heap %u", cell_is_up() ? "up" : "down",
                  cell_last_rssi(), (unsigned)esp_get_free_heap_size());

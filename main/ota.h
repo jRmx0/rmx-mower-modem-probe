@@ -14,6 +14,12 @@ void ota_boot_init(void);
  * any number of times. */
 void ota_confirm(void);
 
+/* After ota_confirm() of an image that came by OTA: tells the server once.
+ * Publishes {"version","previous","partition","time"} retained on
+ * mower/<user>/firmware and creates a probe record "firmware updated ...".
+ * Call with MQTT connected; does nothing otherwise or when already sent. */
+void ota_report_update(void);
+
 /* True while a download runs. */
 bool ota_busy(void);
 
