@@ -30,8 +30,13 @@ $ca = Join-Path $PSScriptRoot '..\certs\rmx-ca-bundle.pem' | Resolve-Path
 
 $pw = $env:RMX_APP_MQTT_PW
 if (-not $pw) {
-    $pw = ssh -o BatchMode=yes rmx-vps 'sudo awk ''$1=="app"{print $2}'' /opt/rmx-vps/services/mosquitto/data/credentials.txt'
-    if (-not $pw) { throw 'could not read the app password (ssh rmx-vps; retry after ~20 s if the connection was dropped)' }
+    # No double quotes in the remote command: Windows PowerShell 5.1 strips them from native args.
+    # New SSH connections to the VPS are sometimes dropped: retry a few times.
+    for ($try = 1; $try -le 3 -and -not $pw; $try++) {
+        if ($try -gt 1) { Write-Host "ssh failed, retrying in 20 s ($try/3)"; Start-Sleep 20 }
+        $pw = ssh -o BatchMode=yes -o ConnectTimeout=15 rmx-vps 'sudo awk ''/^app /{print $2}'' /opt/rmx-vps/services/mosquitto/data/credentials.txt'
+    }
+    if (-not $pw) { throw 'could not read the app password over ssh rmx-vps (3 tries)' }
 }
 
 $id = 'pc-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
