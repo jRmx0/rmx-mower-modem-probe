@@ -22,3 +22,15 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
 # Large buffers (MQTT list responses) go to PSRAM
 CONFIG_SPIRAM_USE_MALLOC=y
+# OTA: a new image boots as "pending verify" and the bootloader rolls back
+# if it resets before confirming itself (main/ota.c)
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+# OTA images must be signed (RSA-3072, Secure Boot V2 scheme) and are checked
+# before the update slot becomes the boot slot. No Secure Boot: no eFuses are
+# burned and USB flashing works as before. The key never goes in the repo.
+CONFIG_ESP32_REV_MIN_3=y
+CONFIG_SECURE_SIGNED_APPS_NO_SECURE_BOOT=y
+CONFIG_SECURE_SIGNED_APPS_RSA_SCHEME=y
+CONFIG_SECURE_SIGNED_ON_UPDATE_NO_SECURE_BOOT=y
+CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES=y
+CONFIG_SECURE_BOOT_SIGNING_KEY="keys/ota_signing_key.pem"

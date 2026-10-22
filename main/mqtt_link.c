@@ -194,6 +194,9 @@ esp_err_t mqtt_link_start(void)
 
 bool mqtt_link_wait_ready(int timeout_ms)
 {
+    if (!s_ev) {
+        return false;   /* never started */
+    }
     EventBits_t want = CONNECTED | RES_SUBBED;
     return (xEventGroupWaitBits(s_ev, want, pdFALSE, pdTRUE, pdMS_TO_TICKS(timeout_ms)) & want) == want;
 }

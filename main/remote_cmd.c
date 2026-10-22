@@ -15,6 +15,7 @@
 #include "gnss.h"
 #include "https_api.h"
 #include "mqtt_link.h"
+#include "ota.h"
 #include "probe_proto.h"
 
 static const char *TAG = "cmd";
@@ -158,6 +159,7 @@ static void add_status(cJSON *reply)
     cJSON_AddNumberToObject(res, "free_internal", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(res, "min_free_heap", esp_get_minimum_free_heap_size());
     cJSON_AddBoolToObject(res, "clock", clock_valid());
+    ota_add_status(res);
 }
 
 static void handle(const char *json, size_t len)
@@ -172,6 +174,7 @@ static void handle(const char *json, size_t len)
     const cJSON *record_id = cJSON_GetObjectItem(cmd, "record_id");
     const cJSON *expires_at = cJSON_GetObjectItem(cmd, "expires_at");
     const cJSON *gps_item = cJSON_GetObjectItem(cmd, "gps");
+    const cJSON *size_item = cJSON_GetObjectItem(cmd, "size");
     bool gps = cJSON_IsTrue(gps_item);
 
     cJSON *reply = cJSON_CreateObject();
@@ -198,6 +201,8 @@ static void handle(const char *json, size_t len)
         set_error(reply, "bad_request", "gps must be true or false");
     } else if (gps && value) {
         set_error(reply, "bad_request", "use either value or gps, not both");
+    } else if (gps && ota_busy()) {
+        set_error(reply, "busy", "no GPS reads during an update (they pause PPP)");
     } else if (gps && (strcmp(name, "create") == 0 || strcmp(name, "https_create") == 0)) {
         char loc[GPS_VALUE_LEN], status[GPS_VALUE_LEN];
         bool fix = gnss_read(loc, sizeof(loc), status, sizeof(status));
@@ -226,12 +231,26 @@ static void handle(const char *json, size_t len)
         run_https(reply, true, value);
     } else if (strcmp(name, "https_list") == 0) {
         run_https(reply, false, NULL);
+    } else if (strcmp(name, "ota") == 0) {
+        const char *error, *message;
+        if (size_item && !cJSON_IsNumber(size_item)) {
+            set_error(reply, "bad_request", "size must be the image size in bytes");
+        } else if (ota_start(id, cJSON_GetStringValue(cJSON_GetObjectItem(cmd, "url")),
+                             cJSON_GetStringValue(cJSON_GetObjectItem(cmd, "version")),
+                             size_item ? (int)cJSON_GetNumberValue(size_item) : 0, &error, &message)) {
+            cJSON_AddBoolToObject(reply, "ok", true);
+            cJSON *res = cJSON_AddObjectToObject(reply, "result");
+            cJSON_AddStringToObject(res, "state", "started");
+            cJSON_AddStringToObject(res, "version", cJSON_GetStringValue(cJSON_GetObjectItem(cmd, "version")));
+        } else {
+            set_error(reply, error, message);
+        }
     } else if (strcmp(name, "restart") == 0) {
         cJSON_AddBoolToObject(reply, "ok", true);
         restart = true;
     } else {
         set_error(reply, "unknown_cmd",
-                  "known: ping status create list delete https_create https_list restart");
+                  "known: ping status create list delete https_create https_list ota restart");
     }
 
     send_reply(reply, t0);

@@ -3,6 +3,8 @@ build/
 managed_components/
 sdkconfig
 sdkconfig.old
+# OTA signing key (back it up offline)
+keys/
 *.log
 # Python
 __pycache__/

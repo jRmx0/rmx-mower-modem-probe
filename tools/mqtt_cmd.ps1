@@ -8,8 +8,9 @@
 #   tools\mqtt_cmd.ps1 create -Gps          # value = the device's GPS location (or why there is none)
 #   tools\mqtt_cmd.ps1 https_create -Gps
 #   tools\mqtt_cmd.ps1 list | https_list | restart
+#   tools\mqtt_cmd.ps1 ota -Version 0.2.1 -Size 851234   # url = $OtaBase/<version>.bin (tools\release.ps1 prints this)
 #
-# Publishes {"id","cmd","value","gps","record_id","expires_at"} on mower/<device>/cmd as the
+# Publishes {"id","cmd","value","gps","record_id","url","version","size","expires_at"} on mower/<device>/cmd as the
 # MQTT login "app" (the backend role: write mower/#) and waits for the answer on
 # mower/<device>/cmd/ack. Needs the Mosquitto clients for Windows and `ssh rmx-vps`.
 # The app password is read from the server into memory (or from $env:RMX_APP_MQTT_PW)
@@ -20,6 +21,10 @@ param(
     [string]$Value,
     [long]$RecordId = -1,
     [switch]$Gps,             # "gps": true (create / https_create)
+    [string]$Version,         # ota: the image version (must match its header)
+    [string]$Url,             # ota: image URL (default $OtaBase/<Version>.bin)
+    [long]$Size = 0,          # ota: image size in bytes (0 = not checked)
+    [string]$OtaBase = 'https://api.rmx.lt/fw/probe',
     [int]$TtlS = 60,          # expires_at = now + TtlS (0 = no expiry, negative = already expired, for tests)
     [int]$TimeoutS = 45,
     [string]$Device = 'probe-device'
@@ -44,6 +49,12 @@ $msg = [ordered]@{ id = $id; cmd = $Cmd }
 if ($PSBoundParameters.ContainsKey('Value')) { $msg.value = $Value }
 if ($Gps) { $msg.gps = $true }
 if ($RecordId -ge 0) { $msg.record_id = $RecordId }
+if ($Cmd -eq 'ota') {
+    if (-not $Version) { throw 'ota needs -Version' }
+    $msg.url = if ($Url) { $Url } else { "$OtaBase/$Version.bin" }
+    $msg.version = $Version
+    if ($Size -gt 0) { $msg.size = $Size }
+}
 if ($TtlS -ne 0) { $msg.expires_at = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + $TtlS }
 $json = $msg | ConvertTo-Json -Compress
 
