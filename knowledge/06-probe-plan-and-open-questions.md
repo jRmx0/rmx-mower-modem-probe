@@ -74,7 +74,7 @@ PC sender: `tools/mqtt_cmd.ps1` (login `app`, the backend role, via `mosquitto_r
 - Using `app` from the PC: on 8883 its client id is forced to `app`, so a real backend on that
   login would be kicked while the script runs (no backend runs yet).
 
-### Firmware updates (OTA) — built 2026-10-22, NOT yet tested on the board
+### Firmware updates (OTA) — verified on the board 2026-10-22 (good update path)
 
 - `main/ota.c` + the `ota` command (README "Firmware updates"): esp_https_ota from
   `https://api.rmx.lt/fw/probe/<version>.bin` (Caddy, basic auth), resumed with HTTP Range
@@ -88,12 +88,17 @@ PC sender: `tools/mqtt_cmd.ps1` (login `app`, the backend role, via `mosquitto_r
 - Build 2026-10-22 (IDF v6.1): app 0xd1000 bytes (signed, 856 KB), **bootloader 0x6d20 bytes,
   only 0x2e0 (736 B) free** below the partition table at 0x8000. Any more bootloader features
   would need a lower bootloader log level or moving the partition table (= new layout, USB).
-- To verify on the board: good update, bad image rolls back, crash on boot rolls back, link
-  lost mid-download resumes, wrong key refused, power cut while writing.
+- Verified 2026-10-22: USB flash of 0.2.0 (chip ESP32-D0WD-V3 rev v3.1) → `ota_0`, self-test
+  passed. `tools\release.ps1 -Send` 0.2.0 → 0.2.1 (856,064 bytes): download ~2 min over LTE
+  (~7 KB/s), reboot ~122 s after the command, answering ~50 s after the reboot, `status` →
+  version 0.2.1, partition `ota_1`, confirmed true; ~3 min from command to confirmed. A second
+  `ota -Version 0.2.1` → `same_version`. VPS: `/fw/` without login → 401.
+- Still to verify: bad image rolls back, crash on boot rolls back, link lost mid-download
+  resumes, wrong key refused, power cut while writing.
 
 Not yet done: reconnect handling verified under real signal loss (the code redials and
 power-cycles the modem, untested), CMUX, sleep/power saving, modem MQTT AT path,
-OTA on the hardware, secrets in NVS instead of sdkconfig, SNTP + certificate date checks.
+OTA failure paths on the hardware, secrets in NVS instead of sdkconfig, SNTP + certificate date checks.
 
 ## Firmware structure (implemented)
 
