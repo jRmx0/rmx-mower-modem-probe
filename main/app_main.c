@@ -24,6 +24,7 @@
 #include "gnss.h"
 #include "https_api.h"
 #include "mqtt_link.h"
+#include "ota.h"
 #include "probe_proto.h"
 #include "remote_cmd.h"
 #include "sdkconfig.h"
@@ -92,6 +93,7 @@ static int self_test_mqtt(void)
         return 1;
     }
     ESP_LOGI(TAG, "TEST mqtt connect: PASS");
+    ota_confirm();   /* a new image that reaches the broker is good */
 
     snprintf(value, sizeof(value), "mqtt from T-SIM7600, uptime %lld s, rssi %d",
              esp_timer_get_time() / 1000000, cell_last_rssi());
@@ -124,6 +126,7 @@ void app_main(void)
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
+    ota_boot_init();   /* a new image rolls back unless MQTT connects in time */
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
@@ -159,6 +162,9 @@ void app_main(void)
     int64_t last_beat = esp_timer_get_time();
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(60000));
+        if (mqtt_link_wait_ready(0)) {
+            ota_confirm();   /* MQTT came up after the self-test */
+        }
         ESP_LOGI(TAG, "alive: ppp %s, rssi %d, free heap %u", cell_is_up() ? "up" : "down",
                  cell_last_rssi(), (unsigned)esp_get_free_heap_size());
         if (CONFIG_PROBE_HEARTBEAT_S > 0 &&

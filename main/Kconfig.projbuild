@@ -53,4 +53,29 @@ menu "rmx probe"
         default 0
         range 0 86400
 
+    config PROBE_OTA_URL_PREFIX
+        string "Firmware updates: allowed URL prefix"
+        default "https://api.rmx.lt/fw/"
+        help
+            The ota command is refused for any other URL. The image itself
+            must also be signed with our key (see README "Firmware updates").
+
+    config PROBE_OTA_USERNAME
+        string "Firmware updates: download login (HTTP basic auth)"
+        default "probe-device"
+
+    config PROBE_OTA_PASSWORD
+        string "Firmware updates: download password (empty = no auth)"
+        default ""
+
+    config PROBE_OTA_CONFIRM_S
+        int "Seconds a new image has to reach MQTT before it rolls back"
+        default 300
+        range 60 3600
+
+    config PROBE_OTA_MIN_CSQ
+        int "Minimum signal (AT+CSQ, 0-31) to start an update"
+        default 5
+        range 0 31
+
 endmenu

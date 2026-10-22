@@ -74,9 +74,26 @@ PC sender: `tools/mqtt_cmd.ps1` (login `app`, the backend role, via `mosquitto_r
 - Using `app` from the PC: on 8883 its client id is forced to `app`, so a real backend on that
   login would be kicked while the script runs (no backend runs yet).
 
+### Firmware updates (OTA) — built 2026-10-22, NOT yet tested on the board
+
+- `main/ota.c` + the `ota` command (README "Firmware updates"): esp_https_ota from
+  `https://api.rmx.lt/fw/probe/<version>.bin` (Caddy, basic auth), resumed with HTTP Range
+  after a drop (3 retries), header check (project, version, not the running one), size check.
+- Rollback: `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`. A new image confirms itself on the first
+  MQTT CONNACK; without it within `CONFIG_PROBE_OTA_CONFIRM_S` (300 s) it rolls back.
+- Signed apps without Secure Boot (decided by the user 2026-10-22: no Secure Boot, no eFuses):
+  RSA-3072, key in gitignored `keys/ota_signing_key.pem`. Needs `CONFIG_ESP32_REV_MIN_3`
+  (the board is v3.1). Verified in a build only: `espsecure verify-signature` passes with the key
+  and fails with another one.
+- Build 2026-10-22 (IDF v6.1): app 0xd1000 bytes (signed, 856 KB), **bootloader 0x6d20 bytes,
+  only 0x2e0 (736 B) free** below the partition table at 0x8000. Any more bootloader features
+  would need a lower bootloader log level or moving the partition table (= new layout, USB).
+- To verify on the board: good update, bad image rolls back, crash on boot rolls back, link
+  lost mid-download resumes, wrong key refused, power cut while writing.
+
 Not yet done: reconnect handling verified under real signal loss (the code redials and
 power-cycles the modem, untested), CMUX, sleep/power saving, modem MQTT AT path,
-OTA, secrets in NVS instead of sdkconfig, SNTP + certificate date checks.
+OTA on the hardware, secrets in NVS instead of sdkconfig, SNTP + certificate date checks.
 
 ## Firmware structure (implemented)
 
@@ -88,6 +105,7 @@ main/
   https_api.c/.h    esp_http_client: login (cookie + Origin), records CRUD
   gnss.c/.h         SIM7600 GNSS over AT (via cell_with_command_mode): on at boot, read on demand
   remote_cmd.c/.h   commands from mower/<user>/cmd, acks on …/cmd/ack
+  ota.c/.h          esp_https_ota download, image checks, first-boot confirm / rollback
   probe_proto.c/.h  JSON envelopes (espressif/cjson), request_id generation
   app_main.c        sequence: board → cell → https test → mqtt test → loop
 idf_component.yml   espressif/esp_modem ^2.1, espressif/mqtt ^1.1, espressif/cjson ^1.7.19
