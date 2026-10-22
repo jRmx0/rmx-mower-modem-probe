@@ -9,12 +9,16 @@ board, the modem, the ESP-IDF setup, esp_modem/PPP, and the server contract. The
 `main/` (verified on hardware); the minimal reference is `tools/ppp_smoke/main/ppp_smoke.c`. Update the knowledge files when you learn something
 new or find a fact wrong (mark what you verified on hardware and when).
 
+Reusable board, chip and ESP-IDF knowledge also lives in the central hub `C:\Repos\esp-knowledge`
+(private repo `jRmx0/esp-knowledge`; read its `INDEX.md`). Its `boards/t-sim7600.md` has the header pinout and
+free GPIOs; put new board or chip facts there, and keep probe-specific knowledge here.
+
 ## Environment
 
 - Windows, PowerShell primary. ESP-IDF v6.1: `. C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1`, then `idf.py`.
 - Board on **COM6** (CH9102). Opening the port resets the ESP32 (not the modem).
 - No interactive `idf.py monitor` for agents: read the serial log with a pyserial script (see `tools/README.md`).
-- Related repos: `C:\Repos\LilyGo-Modem-Series`, `C:\Repos\esp-protocols`, `C:\esp\v6.1\esp-idf`,
+- Related repos: `C:\Repos\esp-knowledge`, `C:\Repos\LilyGo-Modem-Series`, `C:\Repos\esp-protocols`, `C:\esp\v6.1\esp-idf`,
   `C:\Projects\blade-of-grass\rmx-server` (has its own `CLAUDE.md` with server rules).
 
 ## Must-know pitfalls
