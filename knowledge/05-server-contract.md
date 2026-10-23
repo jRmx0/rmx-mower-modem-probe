@@ -39,6 +39,12 @@ CN=api.rmx.lt / CN=mqtt.rmx.lt     ECDSA P-256 leaf, valid 2026-10-15 … 2027-0
   [`certs/rmx-ca-bundle.pem`](../certs/rmx-ca-bundle.pem) (both). openssl verifies both hosts with either root alone.
 - Verified on the device: mbedTLS + `esp_crt_bundle_attach` (PPP path) and the modem's
   TLS with `isrgx1.pem` (AT path) both validate the chain.
+- Since 0.2.3 the firmware's bundle is **only** `certs/rmx-ca-bundle.pem`
+  (`CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE` + custom bundle), not the full Mozilla
+  `cacrt_all.pem`. Why: in Oct 2026 eight eMudhra/emSign CA keys were found to be trivially
+  weak, and `emSign ECC Root CA - G3` is in ESP-IDF's full bundle, so anyone could have issued
+  a `mqtt.rmx.lt` certificate the device accepted. If rmx.lt ever moves off Let's Encrypt,
+  update the bundle and ship it over OTA **before** switching the server.
 - Don't pin the leaf or the intermediate (they rotate every ~60–90 days). Pin roots only.
 - Let's Encrypt chains change (they did in 2025–26); keep both roots, re-check with
   `openssl s_client -connect mqtt.rmx.lt:8883 -servername mqtt.rmx.lt -showcerts`.
