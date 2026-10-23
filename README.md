@@ -29,6 +29,13 @@ python -I -u tools\serial_log.py COM6 120 --until SELF-TEST
 
 `sdkconfig` holds the passwords and is gitignored: never commit it.
 
+TLS trusts only ISRG Root X1 + X2 ([`certs/rmx-ca-bundle.pem`](certs/rmx-ca-bundle.pem)), not
+ESP-IDF's full Mozilla bundle. An `sdkconfig` made before 0.2.3 still has the full bundle:
+in menuconfig, *Component config → mbedTLS → Certificate Bundle*, set *Default certificate
+bundle options* to *Use no default certificates bundle* and enable *Add custom certificates
+to the default bundle* with path `certs/rmx-ca-bundle.pem` (or copy the four TLS lines from
+`sdkconfig.defaults` into `sdkconfig`).
+
 ## Send a command from the PC
 
 ```powershell
