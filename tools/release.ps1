@@ -19,6 +19,13 @@ try {
     $version = (Get-Content version.txt -Raw).Trim()
     idf.py build
     if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+    # sdkconfig keeps its old values over sdkconfig.defaults: refuse to ship an image that
+    # still trusts the full Mozilla bundle (README, "TLS trusts only ISRG Root X1 + X2").
+    $cfg = Get-Content sdkconfig -Raw
+    if ($cfg -notmatch '(?m)^CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y' -or
+        $cfg -notmatch '(?m)^CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="certs/rmx-ca-bundle.pem"') {
+        throw 'sdkconfig still uses the full CA bundle: copy the TLS lines from sdkconfig.defaults (README)'
+    }
     $bin = 'build\rmx_mower_modem_probe.bin'
     $size = (Get-Item $bin).Length
     $sha = (Get-FileHash $bin -Algorithm SHA256).Hash.ToLower()
