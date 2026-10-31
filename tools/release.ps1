@@ -4,7 +4,7 @@
 #   tools\release.ps1 -Send           # ... and sends it to the device (tools\mqtt_cmd.ps1 ota)
 #
 # Needs the ESP-IDF environment (. C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1),
-# the signing key in keys\ota_signing_key.pem (README "Firmware updates") and `ssh rmx-vps`.
+# the signing key in keys\ota_signing_key.pem (wiki page Modem-Probe, "Firmware updates") and `ssh rmx-vps`.
 # Bump version.txt first: the device refuses the version it already runs.
 param(
     [switch]$Send,
@@ -15,16 +15,16 @@ $ErrorActionPreference = 'Stop'
 $root = Join-Path $PSScriptRoot '..' | Resolve-Path
 Push-Location $root
 try {
-    if (-not (Test-Path keys\ota_signing_key.pem)) { throw 'no keys\ota_signing_key.pem (see README "Firmware updates")' }
+    if (-not (Test-Path keys\ota_signing_key.pem)) { throw 'no keys\ota_signing_key.pem (see the wiki page Modem-Probe, "Firmware updates")' }
     $version = (Get-Content version.txt -Raw).Trim()
     idf.py build
     if ($LASTEXITCODE -ne 0) { throw 'build failed' }
     # sdkconfig keeps its old values over sdkconfig.defaults: refuse to ship an image that
-    # still trusts the full Mozilla bundle (README, "TLS trusts only ISRG Root X1 + X2").
+    # still trusts the full Mozilla bundle (wiki page Modem-Probe, "TLS trusts only ISRG Root X1 + X2").
     $cfg = Get-Content sdkconfig -Raw
     if ($cfg -notmatch '(?m)^CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y' -or
         $cfg -notmatch '(?m)^CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="certs/rmx-ca-bundle.pem"') {
-        throw 'sdkconfig still uses the full CA bundle: copy the TLS lines from sdkconfig.defaults (README)'
+        throw 'sdkconfig still uses the full CA bundle: copy the TLS lines from sdkconfig.defaults (wiki page Modem-Probe)'
     }
     $bin = 'build\rmx_mower_modem_probe.bin'
     $size = (Get-Item $bin).Length
