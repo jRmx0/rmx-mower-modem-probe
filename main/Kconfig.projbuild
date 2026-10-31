@@ -58,7 +58,7 @@ menu "rmx probe"
         default "https://api.rmx.lt/fw/"
         help
             The ota command is refused for any other URL. The image itself
-            must also be signed with our key (see README "Firmware updates").
+            must also be signed with our key (see the wiki page Modem-Probe, "Firmware updates").
 
     config PROBE_OTA_USERNAME
         string "Firmware updates: download login (HTTP basic auth)"
